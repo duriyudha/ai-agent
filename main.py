@@ -6,6 +6,7 @@ from google import genai
 from google.genai import types
 
 from prompts import system_prompt
+from call_function import available_functions
 
 def main():
     load_dotenv()
@@ -24,16 +25,23 @@ def main():
     response = client.models.generate_content(
         model=model_name,
         contents=messages,
-        config=types.GenerateContentConfig(system_instruction=system_prompt,
-                                           temperature=0)
+        config=types.GenerateContentConfig(tools=[available_functions],
+                                           system_instruction=system_prompt,
+                                        #    temperature=0,
+                                           )
     )
+
     if args.verbose:
         print(f"User prompt: {args.user_prompt}\n")
         if not response.usage_metadata:
             raise RuntimeError("Usage metadata is missing in the response likely due to a failed API call.")
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}\nResponse tokens: {response.usage_metadata.candidates_token_count}\n")
     
-    print(f"Response:\n{response.text}")
+    if response.function_calls:
+        for function_call in response.function_calls:
+            print(f"Calling function: {function_call.name}({function_call.args})")
+    else:
+        print(f"Response:\n{response.text}")
 
 if __name__ == "__main__":
     main()
