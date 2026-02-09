@@ -22,37 +22,48 @@ def main():
 
     client = genai.Client(api_key=api_key)
     model_name = "gemini-2.5-flash"
-    response = client.models.generate_content(
-        model=model_name,
-        contents=messages,
-        config=types.GenerateContentConfig(tools=[available_functions],
-                                           system_instruction=system_prompt,
-                                        #    temperature=0,
-                                           )
-    )
+    max_iter = 20
+    for _ in range(max_iter):
+        response = client.models.generate_content(
+            model=model_name,
+            contents=messages,
+            config=types.GenerateContentConfig(tools=[available_functions],
+                                            system_instruction=system_prompt,
+                                            #    temperature=0,
+                                            )
+        )
 
-    if args.verbose:
-        print(f"User prompt: {args.user_prompt}\n")
-        if not response.usage_metadata:
-            raise RuntimeError("Usage metadata is missing in the response likely due to a failed API call.")
-        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}\nResponse tokens: {response.usage_metadata.candidates_token_count}\n")
-    
+        if response.candidates:
+            for candidate in response.candidates:
+                messages.append(candidate.content)
+        if args.verbose:
+            print(f"User prompt: {args.user_prompt}\n")
+            if not response.usage_metadata:
+                raise RuntimeError("Usage metadata is missing in the response likely due to a failed API call.")
+            print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}\nResponse tokens: {response.usage_metadata.candidates_token_count}\n")
+        
+        if response.function_calls:
+            function_responses = []
+            for function_call in response.function_calls:
+                # print(f"Calling function: {function_call.name}({function_call.args})")
+                function_call_result = call_function(function_call)
+                if not function_call_result.parts:
+                    raise Exception('Empty "function_call_result.parts"')
+                if not function_call_result.parts[0].function_response:
+                    raise Exception('Got "None" instead of a "FunctionResponse" object')
+                if not function_call_result.parts[0].function_response.response:
+                    raise Exception('Got "None" as function call result')
+                function_responses.append(function_call_result.parts[0])
+                if args.verbose:
+                    print(f"-> {function_call_result.parts[0].function_response.response['result']}")
+            messages.append(types.Content(role="user", parts=function_responses))
+        else:
+            print(f"Response:\n{response.text}")
+            break
+        
     if response.function_calls:
-        function_results = []
-        for function_call in response.function_calls:
-            # print(f"Calling function: {function_call.name}({function_call.args})")
-            function_call_result = call_function(function_call)
-            if not function_call_result.parts:
-                raise Exception('Empty "function_call_result.parts"')
-            if not function_call_result.parts[0].function_response:
-                raise Exception('Got "None" instead of a "FunctionResponse" object')
-            if not function_call_result.parts[0].function_response.response:
-                raise Exception('Got "None" as function call result')
-            function_results += function_call_result.parts[0]
-            if args.verbose:
-                print(f"-> {function_call_result.parts[0].function_response.response['result']}")
-    else:
-        print(f"Response:\n{response.text}")
+        print(f"Exceeded maximum number of iterations ({max_iter})")
+        exit(1)
 
 if __name__ == "__main__":
     main()
