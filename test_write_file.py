@@ -1,9 +1,16 @@
 from functions.write_file import write_file
 
 def main():
-    print(write_file("calculator", "lorem.txt", "wait, this isn't lorem ipsum"))
-    print(write_file("calculator", "pkg/morelorem.txt", "lorem ipsum dolor sit amet"))
-    print(write_file("calculator", "/tmp/temp.txt", "this should not be allowed"))
+    test_cases = [
+        ("calculator", "lorem.txt", "wait, this isn't lorem ipsum"),
+        ("calculator", "pkg/morelorem.txt", "lorem ipsum dolor sit amet"),
+        ("calculator", "/tmp/temp.txt", "this should not be allowed"),
+    ]
+    
+    for test in test_cases:
+        result = write_file(*test)
+        print(result)
+        print("-" * 50)
 
 if __name__ == "__main__":
     main()
